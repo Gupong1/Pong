@@ -1,0 +1,36 @@
+name: vyper_control
+description: "Vyper Control - Remote Device Management"
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.5.0
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # HTTP untuk REST API
+  http: ^1.1.0
+  
+  # Socket.io untuk real-time
+  socket_io_client: ^2.0.3+1
+  
+  # Device info untuk mendapatkan device ID unik
+  device_info_plus: ^9.1.0
+  
+  # Permission untuk berbagai izin
+  permission_handler: ^11.0.1
+  
+  # Untuk menyimpan token
+  shared_preferences: ^2.2.2
+
+  cupertino_icons: ^1.0.8
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
