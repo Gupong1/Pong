@@ -1,19 +1,16 @@
-name: Build Flutter App
+name: Build APK with Auto Error Capture
 
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
-  workflow_dispatch:   # manual trigger
+  workflow_dispatch:
 
 jobs:
   build-android:
-    name: Build Android APK
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout source code
+      - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Setup Flutter
@@ -22,41 +19,49 @@ jobs:
           flutter-version: '3.24.0'
           channel: 'stable'
 
+      # 🔧 PERBAIKAN KOTLIN (WAJIB) - ubah versi 1.7.10 -> 1.9.22
+      - name: Fix Kotlin version
+        run: |
+          sed -i 's/version "1.7.10"/version "1.9.22"/' android/settings.gradle
+          echo "✅ settings.gradle sudah diperbaiki:"
+          cat android/settings.gradle
+
       - name: Get dependencies
         run: flutter pub get
 
-      - name: Build APK (release)
-        run: flutter build apk --release
+      # 🔥 BUILD APK, jika gagal kita tangkap errornya
+      - name: Build APK release
+        id: build
+        continue-on-error: true   # Biarkan workflow lanjut meskipun build gagal
+        run: flutter build apk --release 2>&1 | tee build.log
 
+      # 📝 Jika build gagal, buat error.js dari log
+      - name: Create error.js from build log
+        if: failure() || steps.build.outcome == 'failure'
+        run: |
+          echo "// Error log from Flutter build" > error.js
+          echo "const errorLog = \`" >> error.js
+          cat build.log >> error.js
+          echo "\`;" >> error.js
+          echo "console.error(errorLog);" >> error.js
+
+      # 📤 Upload error.js jika gagal
+      - name: Upload error.js artifact
+        if: failure() || steps.build.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: error-js
+          path: error.js
+
+      # 📤 Upload APK jika berhasil
       - name: Upload APK artifact
+        if: success() && steps.build.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: app-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
 
-  # Opsional: build iOS (hanya berjalan jika Anda punya macOS runner)
-  build-ios:
-    name: Build iOS IPA (macOS)
-    runs-on: macos-latest
-    if: false   # Ubah ke true jika ingin aktif
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.24.0'
-          channel: 'stable'
-
-      - name: Get dependencies
-        run: flutter pub get
-
-      - name: Build IPA (release)
-        run: flutter build ipa --release
-
-      - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-release-ipa
-          path: build/ios/ipa/*.ipa
+      # ❌ Jika build gagal, workflow tetap selesai dengan status gagal agar terlihat
+      - name: Fail workflow if build failed
+        if: failure() || steps.build.outcome == 'failure'
+        run: exit 1
